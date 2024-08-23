@@ -1,44 +1,115 @@
 import sys
 import math
 import random
+import numpy 
 
 # Deliver more ore to hq (left side of the map) than your opponent. Use radars to find ore but beware of traps!
 
-# height: size of the map
-width, height = [int(i) for i in input().split()]
 
-# game loop
-while True:
-    # my_score: Amount of ore delivered
-    my_score, opponent_score = [int(i) for i in input().split()]
-    for i in range(height):
-        inputs = input().split()
-        for j in range(width):
-            # ore: amount of ore or "?" if unknown
-            # hole: 1 if cell has a hole
-            ore = inputs[2*j]
-            hole = int(inputs[2*j+1])
-    # entity_count: number of entities visible to you
-    # radar_cooldown: turns left until a new radar can be requested
-    # trap_cooldown: turns left until a new trap can be requested
-    entity_count, radar_cooldown, trap_cooldown = [int(i) for i in input().split()]
-    robot_moves = []
-    for i in range(entity_count):
-        # entity_id: unique id of the entity
-        # entity_type: 0 for your robot, 1 for other robot, 2 for radar, 3 for trap
-        # y: position of the entity
-        # item: if this entity is a robot, the item it is carrying (-1 for NONE, 2 for RADAR, 3 for TRAP, 4 for ORE)
-        entity_id, entity_type, x, y, item = [int(j) for j in input().split()]
-        if entity_type == 0 and item == 4:
-            robot_moves.append(f"MOVE 0 {y}")
-        elif entity_type == 0 and item == -1:
-            robot_moves.append(f"DIG {random.randint(5,27)} {random.randint(1,13)}")
-        else:
-            robot_moves.append(f"WAIT {entity_id} {entity_type} {x} {y} {item}")
+def main():
+    # height: size of the map
+    width, height = [int(i) for i in input().split()]
 
-    for i in range(5):
-        # Write an action using print
-        # To debug: print("Debug messages...", file=sys.stderr, flush=True)
+    # game loop
+    while True:
+        # my_score: Amount of ore delivered
+        my_score, opponent_score = [int(i) for i in input().split()]
+        hole_map = []
+        ore_map = []
+        for i in range(height):
+            inputs = input().split()
+            hole_list=[]
+            ore_list=[]
+            for j in range(width):
+                # ore: amount of ore or "?" if unknown
+                # hole: 1 if cell has a hole
+                ore = inputs[2*j]
+                hole = int(inputs[2*j+1])
+                if hole == 1:
+                    hole_list.append([j,i])
+                else:
+                    hole_list.append([])
+            hole_map.append(hole_list)
+            ore_map.append(ore_list)
+        # entity_count: number of entities visible to you
+        # radar_cooldown: turns left until a new radar can be requested
+        # trap_cooldown: turns left until a new trap can be requested
+        entity_count, radar_cooldown, trap_cooldown = [int(i) for i in input().split()]
+        robot_moves = []
+        radar_requested = False
+        trap_requested = False
+        for i in range(entity_count):
+            # entity_id: unique id of the entity
+            # entity_type: 0 for your robot, 1 for other robot, 2 for radar, 3 for trap
+            # y: position of the entity
+            # item: if this entity is a robot, the item it is carrying (-1 for NONE, 2 for RADAR, 3 for TRAP, 4 for ORE)
+            entity_id, entity_type, x, y, item = [int(j) for j in input().split()]
+            if ( entity_type == 0 or entity_type == 1 ) and x == 0 and radar_cooldown == 0 and item == -1 and not radar_requested:
+                radar_requested = True
+                robot_moves.append(f"REQUEST RADAR")
+            elif ( entity_type == 0 or entity_type == 1 ) and x == 0 and trap_cooldown == 0 and item == -1 and not trap_requested:
+                trap_requested = True
+                robot_moves.append(f"REQUEST TRAP")
+            elif ( entity_type == 0 or entity_type == 1 ) and item == 2:
+                if flatten(hole_map):
+                    #robot_moves.append(f"DIG {closest(transpose(hole_map),y,x)}")
+                    robot_moves.append(f"WAIT {transpose(hole_map)}")
+                else:
+                    robot_moves.append(f"DIG {nextMoveRandom(x,y)}")
+            elif ( entity_type == 0 or entity_type == 1 ) and item == 3:
+                if flatten(hole_map):
+                    #robot_moves.append(f"DIG {closest(transpose(hole_map),y,x)}")
+                    robot_moves.append(f"WAIT {transpose(hole_map)}")
+                else:
+                    robot_moves.append(f"DIG {nextMoveRandom(x,y)}")
+            elif ( entity_type == 0 or entity_type == 1 ) and item == 4:
+                robot_moves.append(f"MOVE 0 {y}")
+            elif ( entity_type == 0 or entity_type == 1 ) and item == -1:
+                robot_moves.append(f"DIG {nextMoveRandom(x,y)}")
+            else:
+                robot_moves.append(f"WAIT {entity_id} {entity_type} {x} {y} {item}")
 
-        # WAIT|MOVE x y|DIG x y|REQUEST item
-        print(robot_moves[i])
+        for i in range(5):
+            # Write an action using print
+            # To debug: print("Debug messages...", file=sys.stderr, flush=True)
+
+            # WAIT|MOVE x y|DIG x y|REQUEST item
+            # print(f"WAIT {len(hole_map)}")
+            print(robot_moves[i])
+
+
+def nextMoveRandom(x,y):
+    randx = x + random.randint(-4,4)
+    randy = y + random.randint(-4,4)
+    return f"{clamp(randx,0,29)} {clamp(randy,0,14)}"
+
+def clamp(n, minn, maxn):
+    return max(min(maxn, n), minn)
+
+def flattenNoNull(xss):
+    return [x for xs in xss for x in xs if x]
+
+def flatten(xss):
+    return [x for xs in xss for x in xs if x]
+
+def transpose(matrix):
+    return [[row[i] for row in matrix] for i in range(len(matrix[0]))]
+
+def closest(map,x,y):
+    subMap = map[x][y]
+    i=0
+    while not subMap:
+        expandSubmap = map[clamp(x-i,0,29):clamp(y+i,0,29)][clamp(y-i,0,14):clamp(y+i,0,14)]
+        subMap=flattenNoNull(expandSubmap)
+        i=+1
+    return f"{subMap[0][0]} {subMap[0][1]}"
+
+
+
+
+
+
+
+
+if __name__=="__main__":
+    main()
